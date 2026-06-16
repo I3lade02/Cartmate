@@ -95,10 +95,9 @@ Install and log in to EAS:
 ```bash
 npm install --global eas-cli
 eas login
-eas build:configure
 ```
 
-For an installable Android APK, create or update `eas.json` like this:
+The `preview` profile in `eas.json` is configured to build an installable APK:
 
 ```json
 {
@@ -117,6 +116,17 @@ For an installable Android APK, create or update `eas.json` like this:
 }
 ```
 
+Before building in the cloud, add the Firebase values from `.env` to EAS:
+
+```bash
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_API_KEY --value "your-value"
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN --value "your-value"
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_PROJECT_ID --value "your-value"
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET --value "your-value"
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "your-value"
+eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_APP_ID --value "your-value"
+```
+
 Build the APK:
 
 ```bash
@@ -125,7 +135,7 @@ eas build -p android --profile preview
 
 When the build finishes, EAS will provide a download link for the `.apk`.
 
-For cloud builds, make sure the `EXPO_PUBLIC_FIREBASE_*` environment variables are also available to EAS. Local `.env` files are not automatically available in remote builds.
+Local `.env` files are not automatically available in remote EAS builds. If these values are missing, the installed app will show a setup warning instead of starting CartMate.
 
 ## Notifications Note
 
