@@ -22,6 +22,7 @@ import {
 } from "../../services/itemServices";
 import {
   deleteShoppingList,
+  leaveShoppingList,
   listenToShoppingList,
 } from "../../services/listServices";
 import { scheduleItemsAddedNotification } from "../../services/notificationServices";
@@ -46,6 +47,17 @@ type ItemSection = {
   type: "active" | "bought";
   data: ShoppingItem[];
 };
+
+function getListActionErrorMessage(error: unknown) {
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("permission")
+  ) {
+    return "Firebase rejected this action. Deploy the latest Firestore rules, then try again.";
+  }
+
+  return "Could not update this list.";
+}
 
 export function ShoppingListDetailScreen({ navigation, route }: Props) {
   const { listId, listName } = route.params;
@@ -72,10 +84,6 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: listName });
-  }, [listName, navigation]);
 
   useEffect(() => {
     return () => {
@@ -149,6 +157,36 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
       }
     };
   }, [listId, navigation]);
+
+  const checkedCount = items.filter((item) => item.checked).length;
+  const canDeleteList = currentList?.ownerId === user?.uid;
+  const canLeaveList = !!currentList && currentList.ownerId !== user?.uid;
+  const listActionLabel = canDeleteList ? "Delete" : "Leave";
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: listName,
+      headerRight: canDeleteList || canLeaveList
+        ? () => (
+            <Pressable
+              accessibilityRole="button"
+              onPress={canDeleteList ? confirmDeleteList : confirmLeaveList}
+            >
+              <Text style={{ color: colors.dangerText, fontWeight: "700" }}>
+                {listActionLabel}
+              </Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [
+    canDeleteList,
+    canLeaveList,
+    colors.dangerText,
+    listActionLabel,
+    listName,
+    navigation,
+  ]);
 
   function queueRemoteAddNotification(addedItems: ShoppingItem[]) {
     if (!user) {
@@ -289,7 +327,41 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
             } catch (error) {
               isDeletingListRef.current = false;
               console.log(error);
-              Alert.alert("Delete failed", "Could not delete this list.");
+              Alert.alert("Delete failed", getListActionErrorMessage(error));
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function confirmLeaveList() {
+    if (!currentList || !user) {
+      return;
+    }
+
+    Alert.alert(
+      "Leave shopping list?",
+      `"${currentList.name}" will be removed from your lists. Other members can keep using it.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Warning
+              );
+              isDeletingListRef.current = true;
+              itemListenerRef.current?.();
+              listListenerRef.current?.();
+              await leaveShoppingList(currentList, user.uid);
+              navigation.navigate("MyLists");
+            } catch (error) {
+              isDeletingListRef.current = false;
+              console.log(error);
+              Alert.alert("Leave failed", getListActionErrorMessage(error));
             }
           },
         },
@@ -446,8 +518,6 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const checkedCount = items.filter((item) => item.checked).length;
-  const canDeleteList = currentList?.ownerId === user?.uid;
   const activeItems = items.filter((item) => !item.checked);
   const boughtItems = items
     .filter((item) => item.checked)
@@ -570,7 +640,7 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {canDeleteList && (
+            {(canDeleteList || canLeaveList) && (
               <Pressable
                 style={{
                   minHeight: 48,
@@ -583,10 +653,10 @@ export function ShoppingListDetailScreen({ navigation, route }: Props) {
                   backgroundColor: colors.dangerSurface,
                 }}
                 accessibilityRole="button"
-                onPress={confirmDeleteList}
+                onPress={canDeleteList ? confirmDeleteList : confirmLeaveList}
               >
                 <Text style={{ color: colors.dangerText, fontWeight: "700" }}>
-                  Delete this list
+                  {canDeleteList ? "Delete this list" : "Leave this list"}
                 </Text>
               </Pressable>
             )}

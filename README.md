@@ -116,21 +116,16 @@ The `preview` profile in `eas.json` is configured to build an installable APK:
 }
 ```
 
-Before building in the cloud, add the Firebase values from `.env` to EAS:
+Before building in the cloud, add the Firebase values from `.env` to the EAS preview environment:
 
 ```bash
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_API_KEY --value "your-value"
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN --value "your-value"
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_PROJECT_ID --value "your-value"
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET --value "your-value"
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "your-value"
-eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_APP_ID --value "your-value"
+powershell -ExecutionPolicy Bypass -File scripts/push-eas-preview-env.ps1
 ```
 
 Build the APK:
 
 ```bash
-eas build -p android --profile preview
+eas build -p android --profile preview --clear-cache
 ```
 
 When the build finishes, EAS will provide a download link for the `.apk`.

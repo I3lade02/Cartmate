@@ -1,4 +1,5 @@
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -202,6 +203,17 @@ export async function joinListByInviteCode(code: string, userId: string) {
   });
 
   return listId;
+}
+
+export async function leaveShoppingList(list: ShoppingList, userId: string) {
+  if (list.ownerId === userId) {
+    throw new Error("Owners can delete the list instead of leaving it.");
+  }
+
+  await updateDoc(doc(db, "lists", list.id), {
+    memberIds: arrayRemove(userId),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteShoppingList(list: ShoppingList) {

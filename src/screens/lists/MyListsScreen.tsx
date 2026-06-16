@@ -16,6 +16,7 @@ import {
   createShoppingList,
   deleteShoppingList,
   joinListByInviteCode,
+  leaveShoppingList,
   listenToUsersLists,
 } from "../../services/listServices";
 import { useAuthStore } from "../../store/authStore";
@@ -24,6 +25,17 @@ import type { FirestoreSyncState, ShoppingList } from "../../types/shopping";
 
 type Props = NativeStackScreenProps<RootStackParamList, "MyLists">;
 type ModalMode = "create" | "join" | null;
+
+function getListActionErrorMessage(error: unknown) {
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("permission")
+  ) {
+    return "Firebase rejected this action. Deploy the latest Firestore rules, then try again.";
+  }
+
+  return "Could not update this list.";
+}
 
 export function MyListsScreen({ navigation }: Props) {
   const user = useAuthStore((state) => state.user);
@@ -125,7 +137,36 @@ export function MyListsScreen({ navigation }: Props) {
               await deleteShoppingList(list);
             } catch (error) {
               console.log(error);
-              Alert.alert("Delete failed", "Could not delete this list.");
+              Alert.alert("Delete failed", getListActionErrorMessage(error));
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function confirmLeave(list: ShoppingList) {
+    if (!user) {
+      return;
+    }
+
+    Alert.alert(
+      "Leave shopping list?",
+      `"${list.name}" will be removed from your lists. Other members can keep using it.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Warning
+              );
+              await leaveShoppingList(list, user.uid);
+            } catch (error) {
+              console.log(error);
+              Alert.alert("Leave failed", getListActionErrorMessage(error));
             }
           },
         },
@@ -219,6 +260,32 @@ export function MyListsScreen({ navigation }: Props) {
             {item.inviteCode}
           </Text>
         </View>
+
+        <Pressable
+          style={{
+            minHeight: 42,
+            marginTop: 14,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: colors.dangerBorder,
+            backgroundColor: colors.dangerSurface,
+          }}
+          accessibilityRole="button"
+          onPress={(event) => {
+            event.stopPropagation();
+            if (item.ownerId === user?.uid) {
+              confirmDelete(item);
+            } else {
+              confirmLeave(item);
+            }
+          }}
+        >
+          <Text style={{ color: colors.dangerText, fontWeight: "700" }}>
+            {item.ownerId === user?.uid ? "Delete list" : "Leave list"}
+          </Text>
+        </Pressable>
       </Pressable>
     );
 

@@ -6,6 +6,7 @@ import {
   getAuth,
 } from "firebase/auth";
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   connectFirestoreEmulator,
@@ -261,6 +262,26 @@ try {
   }
   assert(memberDeleteDenied, "A non-owner was able to delete the whole list.");
 
+  await updateDoc(doc(dbB, "lists", listRef.id), {
+    memberIds: arrayRemove(userB.uid),
+    updatedAt: serverTimestamp(),
+  });
+
+  const accountBAfterLeave = await getDocs(
+    query(
+      collection(dbB, "lists"),
+      where("memberIds", "array-contains", userB.uid)
+    )
+  );
+  assert(accountBAfterLeave.size === 0, "Account B did not leave the list.");
+
+  const listAfterLeave = await getDoc(listRef);
+  assert(
+    listAfterLeave.data()?.memberIds.length === 1
+      && listAfterLeave.data()?.memberIds[0] === userA.uid,
+    "Leaving changed the wrong list membership."
+  );
+
   const deleteListBatch = writeBatch(dbA);
   deleteListBatch.delete(inviteRefA);
   deleteListBatch.delete(listRef);
@@ -268,7 +289,7 @@ try {
   listRef = undefined;
 
   console.log(
-    "PASS: invite data loaded, membership-by-code detected, two users joined, real-time add/check/edit/delete synced, and owner-only deletion was enforced."
+    "PASS: invite data loaded, membership-by-code detected, two users joined, real-time add/check/edit/delete synced, member leave worked, and owner-only deletion was enforced."
   );
 } finally {
   if (itemRef) {

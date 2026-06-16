@@ -6,15 +6,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type PersistenceValue = Record<string, unknown> | string;
 
-type AsyncStorageAuthPersistence = Persistence & {
-  _isAvailable: () => Promise<boolean>;
-  _set: (key: string, value: PersistenceValue) => Promise<void>;
-  _get: <T extends PersistenceValue>(key: string) => Promise<T | null>;
-  _remove: (key: string) => Promise<void>;
-  _addListener: () => void;
-  _removeListener: () => void;
-};
-
 const rawFirebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -42,44 +33,53 @@ const firebaseConfig = {
   appId: rawFirebaseConfig.appId ?? "1:000000000000:web:missing",
 };
 
-const asyncStorageAuthPersistence: AsyncStorageAuthPersistence = {
-  type: "LOCAL",
-  async _isAvailable() {
-    try {
-      const testKey = "cartmate-firebase-auth-storage-test";
-      await AsyncStorage.setItem(testKey, "1");
-      await AsyncStorage.removeItem(testKey);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  async _set(key, value) {
-    await AsyncStorage.setItem(key, JSON.stringify(value));
-  },
-  async _get(key) {
-    const value = await AsyncStorage.getItem(key);
+function getAsyncStorageAuthPersistence(): Persistence {
+  class AsyncStorageAuthPersistence {
+    static type = "LOCAL";
+    readonly type = "LOCAL";
 
-    if (value === null) {
-      return null;
+    async _isAvailable() {
+      try {
+        const testKey = "cartmate-firebase-auth-storage-test";
+        await AsyncStorage.setItem(testKey, "1");
+        await AsyncStorage.removeItem(testKey);
+        return true;
+      } catch {
+        return false;
+      }
     }
 
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value as PersistenceValue;
+    async _set(key: string, value: PersistenceValue) {
+      await AsyncStorage.setItem(key, JSON.stringify(value));
     }
-  },
-  async _remove(key) {
-    await AsyncStorage.removeItem(key);
-  },
-  _addListener() {
-    // AsyncStorage does not provide cross-process storage events.
-  },
-  _removeListener() {
-    // AsyncStorage does not provide cross-process storage events.
-  },
-};
+
+    async _get<T extends PersistenceValue>(key: string): Promise<T | null> {
+      const value = await AsyncStorage.getItem(key);
+
+      if (value === null) {
+        return null;
+      }
+
+      return JSON.parse(value) as T;
+    }
+
+    async _remove(key: string) {
+      await AsyncStorage.removeItem(key);
+    }
+
+    _addListener() {
+      // AsyncStorage does not provide cross-process storage events.
+    }
+
+    _removeListener() {
+      // AsyncStorage does not provide cross-process storage events.
+    }
+  }
+
+  return AsyncStorageAuthPersistence as unknown as Persistence;
+}
+
+const asyncStorageAuthPersistence = getAsyncStorageAuthPersistence();
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
